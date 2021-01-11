@@ -1,0 +1,176 @@
+
+
+*, *:before, *:after {
+    box-sizing: border-box;
+}
+body, html {
+	height: 100%;
+	width: 100%;
+}
+body, html, div {
+	margin: 0;
+	padding: 0;
+	border: none;
+}
+
+$treerow-padding : 0.7rem;
+$treerow-indent  : 1.0rem;
+
+
+
+.treecontainerOld {
+	position: relative;
+	background-color: lightgray;
+	width: 100%;
+    overflow: auto;
+}
+
+.inset-block {
+	display: inline-block;
+	width: 1em;
+    height: 1px;
+    background-color: aqua;
+}
+
+.treecontainer {
+	position: relative;
+    background-color: lightgray;
+    min-width: 100%;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+	width: fit-content;
+	width: -moz-fit-content;
+	font-size: 2rem;
+}
+
+.row-wrapper {
+	background-color: yellowgreen;
+	display: flex;
+    flex-direction: column;
+}
+
+.treerow {
+	position: relative;	
+	white-space: nowrap;
+	padding-left: 0.4em;
+	background-image: linear-gradient(rgba(255,255,255,0.7) 0%, rgba(255,255,255,0) 100%);
+	display: flex;
+}
+
+.treerow * {
+	/* vertical-align: middle; */
+	align-self: center;
+}
+
+.treeicon {
+	display: flex;
+}
+.treelabel {
+	display: inline;
+	padding-right: 0.4em;
+}
+.treelabel span, .treelabel div {
+	display: inline;
+}
+.treerow .opened::after {
+	content: '\25bc';	
+	display: inline-block;
+	line-height: initial; 
+	width: 1em;
+	text-align: center;
+	position: relative;	
+	/*margin-right: 0.18rem;*/
+}
+
+.treerow .closed::after {
+	content: '\25ba';
+	display: inline-block;
+	line-height: initial; 
+	width: 1em;
+	text-align: center;
+	position: relative;	
+	/* margin-right: 0.18rem; */
+}
+
+.treeicon input[type="checkbox"], .treeicon input[type="radio"] {
+	display: none;
+    vertical-align: middle;
+}
+
+.treeicon input[type="checkbox"]+label::before {	
+    width: 0.9em;
+    height: 0.9em;
+	border: 0.18rem solid darkgrey;
+	background-color: #fff;
+	display: block;
+	position: relative;	
+	content: "";
+	margin-right: 0.18rem;
+}
+
+.treeicon input[type="radio"] + label::before {
+    width: 1em;
+    height: 1em;
+    border-radius: 1em;
+    border: 0.18em solid darkgrey;
+    background-color: #fff;
+	display: block;
+	position: relative;
+	/*top: 0.18rem;*/
+	content: "";
+	margin-right: 0.18em;
+}
+
+.treeicon input[type="checkbox"]:indeterminate+label::before {
+	box-shadow: inset 0px 0px 0px 3px #fff;
+	background-color: #cacaca;
+}
+.treeicon input[type="checkbox"]:checked+label::before {
+	box-shadow: inset 0px 0px 0px 2px #fff;
+	background-color: #A9A9A9;
+}
+.treeicon input[type="radio"]:checked+label::before {
+	box-shadow: inset 0px 0px 0px 2px #fff;
+	background-color: #A9A9A9;
+}
+
+/* toolTip */
+/*
+.tooltip {
+	color: #c32e04; 
+	text-decoration: underline; 
+	cursor: help; 
+  }
+*/
+/*
+.tooltip[data-tooltip]:hover {
+	position: fixed;
+	z-index: 9999;
+	margin-top: 0.0rem;
+}
+*/
+/*
+.tooltip[data-tooltip]::after {
+	content: attr(data-tooltip);
+	pointer-events: none;
+	opacity: 0;
+	transition: opacity 0.5s;
+	
+	display: none;  
+	position: absolute; 
+	top: 0em;
+	left: 0em;
+	// width: 15em;
+	// padding: 0.5em;
+	// color: #000; 
+	// background-color: #ffebe6;
+	// border: solid 1px #c32e04;
+	// border-radius: 0.5em;  
+  }
+   
+  [data-tooltip]:hover::after {
+	  display: block;
+	opacity: 1;
+  }
+  */

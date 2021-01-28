@@ -44,6 +44,14 @@ $treerow-indent  : 1.0rem;
 	font-size: 2rem;
 }
 
+.row-wrapper.closed >.nodecontainer {
+	display: none;
+}
+.row-wrapper.opened >.nodecontainer {
+	display: flex;
+	flex-direction: column;
+}
+
 .row-wrapper {
 	background-color: yellowgreen;
 	display: flex;

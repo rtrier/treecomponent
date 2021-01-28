@@ -98,7 +98,7 @@ export class TreeNode implements TreeNodeParam {
     childDom: HTMLDivElement;
     dom: HTMLElement;
 
-    selected: boolean = false;
+    // selected: boolean = false;
     selectionStatus: SelectionStatus = SelectionStatus.UNSELECTED;
 
     textNode: HTMLSpanElement;
@@ -127,6 +127,7 @@ export class TreeNode implements TreeNodeParam {
 
     css_prop = TreeNode._css_prop;
     insetChilds: number;
+    collapsed: boolean = true;
 
     constructor(data: any, childs?: Array<TreeNode>, params?: TreeNodeParam) {
         this.data = data;
@@ -191,6 +192,23 @@ export class TreeNode implements TreeNodeParam {
         this.childs = childs;
         this.render()
     }
+
+
+    findNode(data: any, prop?: string): Array<TreeNode> {
+        // console.info(data+" "+prop, this.data, this.data[prop])
+        if ((prop && this.data[prop] === data) || this.data === data) {
+            return [this];
+        }
+        else if (this.childs) {
+            for (let i = 0, count = this.childs.length; i < count; i++) {
+                const selNodes = this.childs[i].findNode(data, prop)
+                if (selNodes) {
+                    selNodes.push(this);
+                    return selNodes;
+                }
+            }
+        }
+    }    
 
     selectNode(data: any, prop?: string): Array<TreeNode> {
         // console.info(data+" "+prop, this.data, this.data[prop])
@@ -257,15 +275,19 @@ export class TreeNode implements TreeNodeParam {
                 // this.treerow.style.paddingLeft = ((col - 1) * 1.18 + 0.3) + "rem";
                 // let s = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
                 // this.treerow.style.paddingLeft = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
-                if (this.childVisible()) {
+                if (this.isCollapsed()) {
                     // this.spanOpenClose.innerText = String.fromCharCode(9660);
-                    this.spanOpenClose.classList.add('opened');
-                    this.spanOpenClose.classList.remove('closed');
-                }
-                else {
-                    // this.spanOpenClose.innerText = String.fromCharCode(9654);
+                    this.childDom.classList.replace('opened', 'closed');
+
                     this.spanOpenClose.classList.add('closed');
                     this.spanOpenClose.classList.remove('opened');
+                }
+                else {
+                    // this.spanOpenClose.innerText = String.fromCharCode(9654);                    
+                    this.childDom.classList.replace('closed', 'opened');
+
+                    this.spanOpenClose.classList.add('opened');
+                    this.spanOpenClose.classList.remove('closed');
                 }
                 this.treerow.classList.remove('leaf');
             } 
@@ -276,56 +298,7 @@ export class TreeNode implements TreeNodeParam {
         }
     }    
 
-    /*
-    addNodeOrg(child: TreeNode) {
-        // child.on("selected", this.childSelected, this);
-        child.onSelectionChange.subscribe(this.nodeSelectionChangeHandler);
-        if (!this.childs) {
-            this.childs = []
-        }
-        child.parent = this;
-        child.setTree(this.tree);
-        this.childs.push(child);
 
-        if (this.dom) {
-            if (!this.childDom) {
-                const nodecontainer = this.childDom = document.createElement('div');
-                nodecontainer.className = "nodecontainer"
-                this.dom.appendChild(nodecontainer);
-                nodecontainer.style.display = 'none'
-            }            
-            this.childDom.appendChild(child.render());
-
-            const childCount = this.childs ? this.childs.length : 0
-            
-            // const col = TreeNode.getTreePath(this).length;
-            // this.treerow.style.paddingLeft = ((col - 1) * 1.9 + 0.3) + "rem"
-
-            const col = TreeNode.getTreePath(this).length;
-
-            if (childCount > 0) {               
-                // this.treerow.style.paddingLeft = ((col - 1) * 1.18 + 0.3) + "rem";
-                let s = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
-                this.treerow.style.paddingLeft = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
-                if (this.childVisible()) {
-                    // this.spanOpenClose.innerText = String.fromCharCode(9660);
-                    this.spanOpenClose.classList.add('opened');
-                    this.spanOpenClose.classList.remove('closed');
-                }
-                else {
-                    // this.spanOpenClose.innerText = String.fromCharCode(9654);
-                    this.spanOpenClose.classList.add('closed');
-                    this.spanOpenClose.classList.remove('opened');
-                }
-                this.treerow.classList.remove('leaf');
-            } 
-            else {
-                // this.treerow.style.paddingLeft = ((col - 2) * 1.18 + 0.3) + "rem";
-                this.treerow.style.paddingLeft = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
-            }           
-        }
-    }
-    */
 
     remove() {
         this.dom.remove();
@@ -358,14 +331,24 @@ export class TreeNode implements TreeNodeParam {
     }
 
 
-    childVisible(): boolean {
-        return this.childDom && this.childDom.style.display == 'flex'
+    isCollapsed(): boolean {
+        return this.collapsed;
+        // return this.childDom && this.childDom.style.display == 'flex'
     }
 
     expand() {
-        if (this.childDom) {
-            this.childDom.style.display = 'flex'
+        if (this.collapsed) {
+            this.collapsed = false;
+            if (this.dom) {
+                this.dom.classList.replace('closed', 'opened');
+                this.spanOpenClose.classList.replace('closed', 'opened');
+            }
         }
+        if (this.childs) {
+            for (let i=0, count=this.childs.length; i<count; i++) {
+                this.childs[i].expand();
+            }
+        } 
     }
 
     getSelectMode(): SelectionMode {
@@ -386,7 +369,7 @@ export class TreeNode implements TreeNodeParam {
     }
 
     render(inset?:number): HTMLElement {
-        // console.info(`render inset=${inset}`, this.data);
+        // console.info(`render inset=${inset}`, this.data, this.collapsed);
         const col = TreeNode.getTreePath(this).length;
         if (!inset) {
             inset = 0;
@@ -413,13 +396,20 @@ export class TreeNode implements TreeNodeParam {
             spanOpenClose.addEventListener('click', (ev) => this.onTreeIconClick(ev));
             insetSelf++;
 
+            if (this.collapsed) {
+                this.dom.classList.add('closed');
+            }
+            else {                    
+                this.dom.classList.add('opened');
+            }    
+
             if (childCount > 0) {
                 // treerow.style.paddingLeft = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
-                if (this.childVisible()) {
-                    this.spanOpenClose.classList.add('opened');
-                }
-                else {
+                if (this.collapsed) {                    
                     this.spanOpenClose.classList.add('closed');
+                }
+                else {                    
+                    this.spanOpenClose.classList.add('opened');
                 }                
             }
             else {
@@ -488,7 +478,7 @@ export class TreeNode implements TreeNodeParam {
                     nodecontainer = this.childDom = document.createElement('div');
                     nodecontainer.className = "nodecontainer"
                     dom.appendChild(nodecontainer);
-                    nodecontainer.style.display = 'none'
+                    // nodecontainer.style.display = 'none'
                 }
                 for (let i = 0; i < this.childs.length; i++) {
                     nodecontainer.appendChild(this.childs[i].render(inset+insetSelf));
@@ -657,7 +647,8 @@ export class TreeNode implements TreeNodeParam {
             chBox.id = 'lsw_cb' + this.data.id;
             chBox.className = 'regular-checkbox';
             chBox.setAttribute('aria-label', this.data.id);
-            chBox.checked = this.selected;
+            chBox.checked = this.selectionStatus === SelectionStatus.SELECTED || this.selectionStatus === SelectionStatus.INDETERMINATE;
+            chBox.indeterminate = this.selectionStatus === SelectionStatus.INDETERMINATE;
             chBox.addEventListener('change', (ev) => this.onchBoxChange(ev));
         }
         return this.chBox
@@ -670,7 +661,7 @@ export class TreeNode implements TreeNodeParam {
             chBox.id = 'lsw_cb' + this.data.id;
             chBox.className = 'regular-checkbox';
             chBox.setAttribute('aria-label', this.data.id);
-            chBox.checked = this.selected;
+            chBox.checked = this.selectionStatus===SelectionStatus.SELECTED;
             chBox.addEventListener('change', (ev) => this.onchBoxChange(ev));            
             this.chBox = chBox;
         }
@@ -678,8 +669,8 @@ export class TreeNode implements TreeNodeParam {
     }
 
     onchBoxChange(evt: any) {
-        console.warn(`onchBoxChange ${this.data.name} ${this.chBox.checked} childCount=${this.childs ? this.childs.length : 0}`);
-        console.warn(this);
+        // console.warn(`onchBoxChange ${this.data.name} ${this.chBox.checked} childCount=${this.childs ? this.childs.length : 0}`);
+        // console.warn(this);
         if (this.childs) {
             const isSelected = this.chBox.checked;
             for (let i = 0; i < this.childs.length; i++) {
@@ -694,42 +685,44 @@ export class TreeNode implements TreeNodeParam {
 
 
 
-    itemClicked(evt: MouseEvent): void {
-        this.setSelected(!this.selected);
+    itemClicked(evt: MouseEvent): void {        
+        this.setSelected(this.selectionStatus===SelectionStatus.UNSELECTED);
     }
 
     onTreeIconClick(evt: MouseEvent) {
-        // console.info(`onTreeIconClick ${this.data.name}`);
+        // console.info(`onTreeIconClick ${this.collapsed}`);
         if (this.childs && this.childs.length > 0) {
-            if (this.childDom.style.display == 'none') {
-                this.childDom.style.display = 'block';
-                // this.textNode.innerText = String.fromCharCode(9660);
+            if (this.collapsed) {
+                this.dom.classList.replace('closed', 'opened');
+                // this.childDom.classList.replace('closed', 'opened');
                 this.spanOpenClose.classList.replace('closed', 'opened');
             }
             else {
-                this.childDom.style.display = 'none';
-                // this.textNode.innerText = String.fromCharCode(9654);
+                this.dom.classList.replace('opened', 'closed');
+                // this.childDom.classList.replace('opened', 'closed');
                 this.spanOpenClose.classList.replace('opened', 'closed');
             }
+            this.collapsed=!this.collapsed;
         }
         evt.stopImmediatePropagation();
     }
 
-    isSelected(): boolean {
-        if (this.chBox) {
-            return this.chBox.checked;
-        }
-        return this.selected;
-    }
+    // isSelected(): boolean {
+    //     if (this.chBox) {
+    //         return this.chBox.checked;
+    //     }
+    //     return this.selected;
+    // }
 
     getSelectionsStatus():SelectionStatus {
-        if (this.chBox) {
-            if (this.chBox.checked) {
-                return this.chBox.indeterminate ? SelectionStatus.INDETERMINATE : SelectionStatus.SELECTED;
-            }
-            return SelectionStatus.UNSELECTED;
-        }
-        return this.selected ? SelectionStatus.SELECTED : SelectionStatus.UNSELECTED;
+        // if (this.chBox) {
+        //     if (this.chBox.checked) {
+        //         return this.chBox.indeterminate ? SelectionStatus.INDETERMINATE : SelectionStatus.SELECTED;
+        //     }
+        //     return SelectionStatus.UNSELECTED;
+        // }
+        // return this.selected ? SelectionStatus.SELECTED : SelectionStatus.UNSELECTED;
+        return this.selectionStatus;
     }
 
     /*
@@ -739,66 +732,46 @@ export class TreeNode implements TreeNodeParam {
     */
 
     _getStatusOfChilds():SelectionStatus {
-        if (this.chBox) {
-            let count = 0;
-            for (let i = 0; i < this.childs.length; i++) {
-                // console.info(`\t ${i} ${SelectionStatus[this.childs[i].getSelectionsStatus()]}`);
-                const sStatus = this.childs[i].getSelectionsStatus();
-                if (sStatus===SelectionStatus.SELECTED) {
-                    count++;
-                } else {
-                    if (sStatus===SelectionStatus.INDETERMINATE) {
-                        return SelectionStatus.INDETERMINATE;
-                    }
+        let count = 0;
+        for (let i = 0; i < this.childs.length; i++) {
+            // console.info(`\t ${i} ${SelectionStatus[this.childs[i].getSelectionsStatus()]}`);
+            const sStatus = this.childs[i].getSelectionsStatus();
+            if (sStatus===SelectionStatus.SELECTED) {
+                 count++;
+            } else {
+                if (sStatus===SelectionStatus.INDETERMINATE) {
+                    return SelectionStatus.INDETERMINATE;
                 }
             }
-            if (count === 0) return SelectionStatus.UNSELECTED;
-            return (this.childs.length > count) ? SelectionStatus.INDETERMINATE : SelectionStatus.SELECTED;
         }
+        if (count === 0) return SelectionStatus.UNSELECTED;
+        return (this.childs.length > count) ? SelectionStatus.INDETERMINATE : SelectionStatus.SELECTED;
     }
 
     childSelected(n: TreeNode, selectionStatus: SelectionStatus) {
-        console.info(`childSelected this=${this.data.name} child=${n.data.name} ${SelectionStatus[selectionStatus]}`)
-        if (this.chBox) {
-            // let count = 0;
-            // let indeterminate = false;
-            // for (let i = 0; i < this.childs.length; i++) {
-            //     console.info(`\t ${i} ${SelectionStatus[this.childs[i].getSelectionsStatus()]}`);
-            //     if (this.childs[i].getSelectionsStatus()===SelectionStatus.SELECTED) {
-            //         count++;
-            //     } else 
-            // }
-            const selStatus = this._getStatusOfChilds();
+        // console.info(`childSelected this=${this.data.bezeichnung} child=${n.data.bezeichnung} ${SelectionStatus[selectionStatus]}`);
+        const selStatus = this._getStatusOfChilds();
+        if (this.chBox) {           
             if (selStatus === SelectionStatus.UNSELECTED) {
                 this.chBox.checked = false;
                 this.chBox.indeterminate = false;
-                // this.onSelectionChange.dispatch(this, SelectionStatus.UNSELECTED);
             }
             else {
                 this.chBox.checked = true;
                 this.chBox.indeterminate = selStatus === SelectionStatus.INDETERMINATE;
             }
-            this.selectionStatus = selStatus;
-
-            this.onSelectionChange.dispatch(this, selStatus);
-            //     }
-            //     else {
-            //         this.chBox.indeterminate = false;
-            //         this.onSelectionChange.dispatch(this, SelectionStatus.SELECTED);
-            //     }
-            // }
         }
-        else {
-            this.onSelectionChange.dispatch(n, selectionStatus);
-        }
-
+        // console.info(`childSelected this=${this.data.bezeichnung} child=${n.data.bezeichnung} ${SelectionStatus[selectionStatus]} 
+        // => ${selStatus}`);
+        this.selectionStatus = selStatus;
+        this.onSelectionChange.dispatch(this, selStatus);        
     }
 
 
     getSelected(): Array<any> {
         let ids: Array<any> = [];
-        if (this.isSelected()) {
-            if (this.chBox.checked && !this.chBox.indeterminate) {
+        if (this.selectionStatus===SelectionStatus.SELECTED || this.selectionStatus===SelectionStatus.INDETERMINATE) {
+            if (this.selectionStatus===SelectionStatus.SELECTED) {
                 ids.push(this.data);
             }
             if (this.childs) {
@@ -810,57 +783,20 @@ export class TreeNode implements TreeNodeParam {
         return ids;
     }
 
-    // private setSelectionStatus(selectionStatus: SelectionStatus) {        
-    //     if (this.selectionStatus === selectionStatus) {
-    //         return;
-    //     }
-    //     if (this.getSelectMode() === SelectionMode.SINGLE) {
-    //         if (this.treerow) {
-    //             if (selectionStatus === SelectionStatus.SELECTED) {
-    //                 this.treerow.classList.remove('selected');
-    //             }
-    //             else {
-    //                 this.treerow.classList.add('selected');
-    //             }
-                
-    //         }
-    //     }
-    //     else {
-    //         const selected = SelectionStatus.SELECTED === 
-    //         if (this.chBox) {
-    //             this.chBox.checked = selected;
-    //         }
-    //         if (this.childs) {
-    //             for (let i = 0; i < this.childs.length; i++) {
-    //                 this.childs[i].setSelected(selected);
-    //             }
-    //         }
-    //         this.selected = selected;
-    //     }
-        
-    //     this.selectionStatus = selectionStatus;
-    //     this.onSelectionChange.dispatch(this, selectionStatus);
-    // }
-
 
     setSelected(selected: boolean) {
-        console.info(`setSelected ${this.data.name? this.data.name : this.data} SelectionMode=${SelectionMode[this.getSelectMode()]} this.selected=${this.selected} => ${selected}`);
-        // if (selected === this.selected) {
-        //     console.error("notFired");
-        //     return;
-        // }
+        // console.info(`setSelected ${this.data.name? this.data.name : this.data} SelectionMode=${SelectionMode[this.getSelectMode()]}`);
 
         const selectionsStatus = selected ? SelectionStatus.SELECTED : SelectionStatus.UNSELECTED;
         if (selectionsStatus === this.selectionStatus) {
             return;
         }
         if (this.getSelectMode() === SelectionMode.SINGLE) {
-            // this._setSelected(selected);
             if (this.treerow) {
-                if (this.selected) {
-                    this.treerow.classList.remove('selected');
-                } else {
+                if (this.selectionStatus===SelectionStatus.UNSELECTED) {
                     this.treerow.classList.add('selected');
+                } else {                    
+                    this.treerow.classList.remove('selected');
                 }
             }
         }
@@ -872,8 +808,7 @@ export class TreeNode implements TreeNodeParam {
                 for (let i = 0; i < this.childs.length; i++) {
                     this.childs[i].setSelected(selected);
                 }
-            }
-            this.selected = selected;
+            }            
         }
         this.selectionStatus = selected ? SelectionStatus.SELECTED : SelectionStatus.UNSELECTED;
         this.onSelectionChange.dispatch(this, this.selectionStatus);
@@ -955,9 +890,15 @@ export class RadioGroupTreeNode extends TreeNode {
         }
     }
 
+    // childSelected(n: TreeNode, selectionStatus: SelectionStatus) {
+    //     console.info(`radioTreeNode.childSelected this=${this.data.bezeichnung} child=${n.data.bezeichnung} ${SelectionStatus[selectionStatus]}`);     
+    //     this.onSelectionChange.dispatch(n, selectionStatus);        
+    // }
+
     childSelected(node: TreeNode, status: SelectionStatus) {
         // console.error(`RadioGroupTreeNode.childSelected ${node.data.name} ${SelectionStatus[status]}`);        
-        if (node.isSelected()) {
+        // console.info(`radioTreeNode.childSelected this=${this.data.bezeichnung} child=${node.data.bezeichnung} ${SelectionStatus[status]}`);     
+        if (node.getSelectionsStatus()===SelectionStatus.SELECTED) {
             for (let i = 0, count = this.childs.length; i < count; i++) {
                 if (this.childs[i] !== node) {
                     this.childs[i].setSelected(false)

@@ -155,6 +155,12 @@ export class Tree {
         }
     }
 
+    expandAll():void {
+        for (let i=0, count=this.nodes.length; i<count; i++) {
+            this.nodes[i].expand();
+        }
+    }
+
     removeNode(node: TreeNode) {
         // console.info("removeNode", node);
         node.setTree(null)
@@ -262,7 +268,7 @@ export class Tree {
                 // console.info("dispatch01");
                 // this.onSelectionChange.dispatch(node, SelectionStatus.UNSELECTED); 
             }
-            if (node && node.selected) {
+            if (node && node.selectionStatus===SelectionStatus.SELECTED) {
                 this.selectedNode = node;
                 // console.info("dispatch02");
                 this.onSelectionChange.dispatch(this.selectedNode, status); 

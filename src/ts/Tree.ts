@@ -13,7 +13,7 @@ export class Tree {
     static NODE_SELECTED_EVENT = "node_selected";
     static NODE_UNSELECTED_EVENT = "node_unselected";
 
-    selectMode:SelectionMode = SelectionMode.SINGLE
+    selectMode:SelectionMode = SelectionMode.SINGLE;
 
     nodeSelectionChangeHandler:(node:TreeNode, SelectionStatus:SelectionStatus)=>void;
     onSelectionChange = new EventDispatcher<TreeNode, SelectionStatus>();
@@ -278,8 +278,7 @@ export class Tree {
                 this.onSelectionChange.dispatch(node, status); 
             }
         }
-        else {        
-            // console.info("dispatch04");
+        else {
             this.onSelectionChange.dispatch(node, status);
         }
     }

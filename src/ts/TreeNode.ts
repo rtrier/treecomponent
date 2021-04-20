@@ -41,10 +41,11 @@ export interface TreeNodeParam {
     nodeRenderer?: NodeRenderer,
     actions?: Array<Action>,
     // multiselection?:boolean
-    hideEmptyNode?: boolean
-    selectMode?: SelectionMode
-    selected?: boolean
-    attName2Render?:string
+    hideEmptyNode?: boolean,
+    selectMode?: SelectionMode,
+    selected?: boolean,
+    attName2Render?:string,
+    expandOnlyOneNode? : boolean
 }
 
 
@@ -55,7 +56,7 @@ const standardRender: NodeRenderer = {
     render: (node: TreeNode) => {
         const div = document.createElement("div");
         if (typeof node.data === 'string') {
-            div.innerText = node.data;
+            div.innerHTML = node.data;
             div.dataset.tooltip = node.data;
             div.setAttribute("data-tooltip", node.data);
             div.title = node.data;
@@ -65,7 +66,7 @@ const standardRender: NodeRenderer = {
             if (!txt) {
                 debugger
             }
-            div.innerText = txt;
+            div.innerHTML = txt;
             div.dataset.tooltip = txt;
             div.setAttribute("data-tooltip", txt);
             div.title = txt;
@@ -84,8 +85,10 @@ export enum SelectionStatus {
 export class TreeNode implements TreeNodeParam {
 
     nodeSelectionChangeHandler: (node: TreeNode, SelectionStatus: SelectionStatus) => void;
+    childExpandChangeHandler: (node: TreeNode, expand: boolean) => void;
 
     onSelectionChange = new EventDispatcher<TreeNode, SelectionStatus>();
+    onExpandChange = new EventDispatcher<TreeNode, boolean>();
 
     data: any;
 
@@ -100,6 +103,8 @@ export class TreeNode implements TreeNodeParam {
 
     // selected: boolean = false;
     selectionStatus: SelectionStatus = SelectionStatus.UNSELECTED;
+
+    expandOnlyOneNode : boolean;
 
     textNode: HTMLSpanElement;
 
@@ -129,7 +134,7 @@ export class TreeNode implements TreeNodeParam {
     insetChilds: number;
     collapsed: boolean = true;
 
-    constructor(data: any, childs?: Array<TreeNode>, params?: TreeNodeParam) {
+    constructor(data: any, childs?: Array<TreeNode>, params?: TreeNodeParam) {        
         this.data = data;
         this.childs = childs;
         this.nodeSelectionChangeHandler = (node: TreeNode, selectionStatus: SelectionStatus) => this.childSelected(node, selectionStatus);
@@ -137,12 +142,18 @@ export class TreeNode implements TreeNodeParam {
             for (let k in params) {
                 this[k] = params[k]
             }
-
+            if (params.expandOnlyOneNode) {
+                this.childExpandChangeHandler = (node, expanded) => this.childExpandChanged(node, expanded);
+            }
         }
+        
         if (childs && childs.length > 0) {
             for (let i = 0, count = childs.length; i < count; i++) {
                 childs[i].onSelectionChange.subscribe(this.nodeSelectionChangeHandler);
-                childs[i].parent = this
+                childs[i].parent = this;
+                if (params?.expandOnlyOneNode) {
+                    childs[i].onExpandChange.subscribe(this.childExpandChangeHandler);
+                }
             }
         }
 
@@ -154,6 +165,7 @@ export class TreeNode implements TreeNodeParam {
             }
         }
     }
+
 
     actionChanged(evt) {
         this.render();
@@ -213,6 +225,7 @@ export class TreeNode implements TreeNodeParam {
     selectNode(data: any, prop?: string): Array<TreeNode> {
         // console.info(data+" "+prop, this.data, this.data[prop])
         if ((prop && this.data[prop] === data) || this.data === data) {
+            console.info("setSSS");
             this.setSelected(true);            
             return [this];
         }
@@ -248,6 +261,9 @@ export class TreeNode implements TreeNodeParam {
         // child.on("selected", this.childSelected, this);
         // console.info(`addNode childInset=${this.insetChilds}`, this.data, child.data);
         child.onSelectionChange.subscribe(this.nodeSelectionChangeHandler);
+        if (this.onExpandChange) {
+            child.onExpandChange.subscribe(this.childExpandChangeHandler);
+        }
         if (!this.childs) {
             this.childs = []
         }
@@ -260,7 +276,7 @@ export class TreeNode implements TreeNodeParam {
                 const nodecontainer = this.childDom = document.createElement('div');
                 nodecontainer.className = "nodecontainer"
                 this.dom.appendChild(nodecontainer);
-                nodecontainer.style.display = 'none'
+                // rtr nodecontainer.style.display = 'none'
             }            
             this.childDom.appendChild(child.render(this.insetChilds));
 
@@ -336,21 +352,33 @@ export class TreeNode implements TreeNodeParam {
         // return this.childDom && this.childDom.style.display == 'flex'
     }
 
-    expand() {
+    /**
+     * expands this node and childs if onlyCurrentNode is not true
+     */
+    expand(onlyCurrentNode?:boolean) {
         if (this.collapsed) {
             this.collapsed = false;
             if (this.dom) {
                 this.dom.classList.replace('closed', 'opened');
                 this.spanOpenClose.classList.replace('closed', 'opened');
             }
-        }
-        if (this.childs) {
+        }        
+        if (!onlyCurrentNode && this.childs) {
             for (let i=0, count=this.childs.length; i<count; i++) {
                 this.childs[i].expand();
             }
         } 
     }
 
+    collapse() {
+        if (!this.collapsed) {
+            this.collapsed = true;
+            if (this.dom) {
+                this.dom.classList.replace('opened', 'closed');
+                this.spanOpenClose.classList.replace('opened', 'closed');
+            }
+        }
+    }
     getSelectMode(): SelectionMode {
         if (this.selectMode !== undefined) {
             return this.selectMode;
@@ -369,6 +397,131 @@ export class TreeNode implements TreeNodeParam {
     }
 
     render(inset?:number): HTMLElement {
+        // console.info(`render inset=${inset}`, this.data, this.collapsed);
+        const col = TreeNode.getTreePath(this).length;
+        if (!inset) {
+            inset = 0;
+        }        
+        let insetSelf = 0;
+        // let inset = col-1;
+
+        let dom = this.dom;
+        let treerow = this.treerow
+        if (!dom) {
+            dom = this.dom = document.createElement("div");
+            dom.className = 'row-wrapper',
+            treerow = this.treerow = document.createElement('div');
+            treerow.id = "treerow" + nodeCounter            
+            treerow.className = "treerow";
+            dom.appendChild(treerow);
+
+            const childCount = this.childs ? this.childs.length : 0
+            const selectMode = this.getSelectMode();
+            const span = document.createElement('div');
+            span.className = "treeicon";
+
+            const spanOpenClose = this.spanOpenClose = document.createElement('span');
+            spanOpenClose.addEventListener('click', (ev) => this.onTreeIconClick(ev));
+            insetSelf++;
+
+            if (this.collapsed) {
+                this.dom.classList.add('closed');
+            }
+            else {                    
+                this.dom.classList.add('opened');
+            }    
+
+            if (childCount > 0) {
+                // treerow.style.paddingLeft = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
+                if (this.collapsed) {                    
+                    this.spanOpenClose.classList.add('closed');
+                }
+                else {                    
+                    this.spanOpenClose.classList.add('opened');
+                }                
+            }
+            else {
+                if (selectMode === SelectionMode.SINGLE) {
+                    treerow.addEventListener('click', (ev) => this.itemClicked(ev));
+                }
+                // treerow.style.paddingLeft = (col - 2) * 2.8 + 0.3) + "rem"
+                if (selectMode === SelectionMode.RADIO) {
+                    // this.treerow.style.paddingLeft = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
+                    //treerow.style.paddingLeft = ((col-1)*1.18 + 0.3) + "rem"
+                } else {
+                    // treerow.style.paddingLeft = ((col)*1.18 + 0.3) + "rem";
+                    // this.treerow.style.paddingLeft = `calc(${col} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
+                }
+                if (col > 1) {
+                    treerow.className = 'treerow leaf'
+                }
+                // spanOpenClose.innerHTML = "&nbsp;"
+            }
+            this.textNode = spanOpenClose
+            span.appendChild(spanOpenClose);
+            if (selectMode === SelectionMode.MULTI) {
+                const cb: HTMLInputElement = this._createCeckBox()
+                span.appendChild(cb);
+                const label = document.createElement("label");
+                span.appendChild(label);
+                label.addEventListener('click', function () { cb.click() });   
+                insetSelf++;             
+            } else if (selectMode === SelectionMode.RADIO) {
+                const cb: HTMLInputElement = this._createRadioBttn()
+                span.appendChild(cb);
+                const label = document.createElement("label");
+                span.appendChild(label)
+                label.addEventListener('click', function () { 
+                    cb.click();
+                });
+                insetSelf++;
+            }
+            // let inseg = 0;
+            for (let i=0; i<inset ; i++) {
+                const insetBlock = document.createElement("span");
+                insetBlock.className = "inset-block";
+                treerow.appendChild(insetBlock);
+                // inseg++;
+            }
+            // console.info(`inseg=${inseg}`)
+            treerow.appendChild(span);
+            const labelDiv = document.createElement("div")
+            labelDiv.className = 'treelabel'
+            const label = this.nodeRenderer.render(this)
+            if (label) {
+                labelDiv.appendChild(label)
+                treerow.appendChild(labelDiv);
+            }
+
+            if (this.actions) {
+                treerow.appendChild(this.renderActions())
+            }
+
+            let nodecontainer = this.childDom;
+            if (nodecontainer) {
+                nodecontainer.innerHTML = null
+            }
+
+            if (childCount > 0) {
+                if (!nodecontainer) {
+                    nodecontainer = this.childDom = document.createElement('div');
+                    nodecontainer.className = "nodecontainer"
+                    dom.appendChild(nodecontainer);
+                    // nodecontainer.style.display = 'none'
+                }
+                for (let i = 0; i < this.childs.length; i++) {
+                    nodecontainer.appendChild(this.childs[i].render(inset+insetSelf));
+                }
+
+            }      
+            this.dom.style.display = (this.hideEmptyNode && childCount === 0) ? 'none' : 'flex';
+        }
+        this.insetChilds = inset+insetSelf;
+        return dom
+    }
+
+
+    renderOrg(inset?:number): HTMLElement {
         // console.info(`render inset=${inset}`, this.data, this.collapsed);
         const col = TreeNode.getTreePath(this).length;
         if (!inset) {
@@ -481,7 +634,7 @@ export class TreeNode implements TreeNodeParam {
                     // nodecontainer.style.display = 'none'
                 }
                 for (let i = 0; i < this.childs.length; i++) {
-                    nodecontainer.appendChild(this.childs[i].render(inset+insetSelf));
+                    nodecontainer.appendChild(this.childs[i].renderOrg(inset+insetSelf));
                 }
 
             }      
@@ -490,130 +643,6 @@ export class TreeNode implements TreeNodeParam {
         this.insetChilds = inset+insetSelf;
         return dom
     }
-/*
-    renderOrg(): HTMLElement {
-
-        const col = TreeNode.getTreePath(this).length;
-
-        let dom = this.dom;
-        let treerow = this.treerow
-        if (!dom) {
-            dom = this.dom = document.createElement("div");
-            dom.className = 'row-wrapper',
-            treerow = this.treerow = document.createElement('div');
-            treerow.id = "treerow" + nodeCounter
-            // DomEvent.on(treerow, 'click', this.onclick, this);
-            treerow.className = "treerow";
-            dom.appendChild(treerow);
-
-            // start
-            // dom = this.dom = document.createElement("div")
-            // dom = this.dom = treerow = this.treerow = document.createElement('div');
-            // treerow.id = "treerow" + nodeCounter
-            // // // DomEvent.on(treerow, 'click', this.onclick, this);
-            // treerow.className = "treerow";
-            // // dom.appendChild(treerow);
-            // end
-
-
-            const childCount = this.childs ? this.childs.length : 0
-            const selectMode = this.getSelectMode();
-            const span = document.createElement('div');
-            span.className = "treeicon";
-
-            const spanOpenClose = this.spanOpenClose = document.createElement('span');
-            spanOpenClose.addEventListener('click', (ev) => this.onTreeIconClick(ev));
-
-            if (childCount > 0) {
-                // treerow.style.paddingLeft = ((col - 1) * 1.9 + 0.3) + "rem"
-                // treerow.style.paddingLeft = ((col - 1) * 1.180 + 0.3) + "rem"
-                treerow.style.paddingLeft = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
-                if (this.childVisible()) {
-                    // spanOpenClose.innerText = String.fromCharCode(9660);
-                    this.spanOpenClose.classList.add('opened');
-                }
-                else {
-                    this.spanOpenClose.classList.add('closed');
-                    // spanOpenClose.innerText = String.fromCharCode(9654);
-                }
-            }
-            else {
-                if (selectMode === SelectionMode.SINGLE) {
-                    treerow.addEventListener('click', (ev) => this.itemClicked(ev));
-                }
-                // treerow.style.paddingLeft = (col - 2) * 2.8 + 0.3) + "rem"
-                if (selectMode === SelectionMode.RADIO) {
-                    this.treerow.style.paddingLeft = `calc(${col - 1} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
-                    //treerow.style.paddingLeft = ((col-1)*1.18 + 0.3) + "rem"
-                } else {
-                    // treerow.style.paddingLeft = ((col)*1.18 + 0.3) + "rem";
-                    this.treerow.style.paddingLeft = `calc(${col} * (${this.css_prop.iconWidth} + ${this.css_prop.iconDistance}) + ${this.css_prop.treePadding})`;
-                }
-                if (col > 1) {
-                    treerow.className = 'treerow leaf'
-                }
-                // spanOpenClose.innerHTML = "&nbsp;"
-            }
-            this.textNode = spanOpenClose
-            span.appendChild(spanOpenClose);
-            if (selectMode === SelectionMode.MULTI) {
-                const cb: HTMLInputElement = this._createCeckBox()
-                span.appendChild(cb);
-                const label = document.createElement("label");
-                span.appendChild(label)
-                label.addEventListener('click', function () { cb.click() })
-            } else if (selectMode === SelectionMode.RADIO) {
-                const cb: HTMLInputElement = this._createRadioBttn()
-                span.appendChild(cb);
-                const label = document.createElement("label");
-                span.appendChild(label)
-                label.addEventListener('click', function () { 
-                    cb.click();
-                });
-            } else if (selectMode === SelectionMode.RADIO_GROUP) {
-                // const cb: HTMLInputElement = this._createRadioBttn()
-                // cb.checked = true
-                // span.appendChild(cb);
-                // const label = document.createElement("label");
-                // span.appendChild(label)
-            }
-            treerow.appendChild(span);
-            const labelDiv = document.createElement("div")
-            labelDiv.className = 'treelabel'
-            const label = this.nodeRenderer.render(this)
-            if (label) {
-                labelDiv.appendChild(label)
-                treerow.appendChild(labelDiv);
-            }
-
-            if (this.actions) {
-                treerow.appendChild(this.renderActions())
-            }
-
-            let nodecontainer = this.childDom;
-            if (nodecontainer) {
-                nodecontainer.innerHTML = null
-            }
-
-            if (childCount > 0) {
-                if (!nodecontainer) {
-                    nodecontainer = this.childDom = document.createElement('div');
-                    nodecontainer.className = "nodecontainer"
-                    dom.appendChild(nodecontainer);
-                    nodecontainer.style.display = 'none'
-                }
-                for (let i = 0; i < this.childs.length; i++) {
-                    nodecontainer.appendChild(this.childs[i].render());
-                }
-
-            }      
-            this.dom.style.display = (this.hideEmptyNode && childCount === 0) ? 'none' : 'flex';
-        }
-
-        return dom
-    }    
-
-*/
 
     renderActions(): HTMLElement {
         let actDiv = document.createElement("div")
@@ -703,6 +732,7 @@ export class TreeNode implements TreeNodeParam {
                 this.spanOpenClose.classList.replace('opened', 'closed');
             }
             this.collapsed=!this.collapsed;
+            this.onExpandChange.dispatch(this, !this.collapsed);
         }
         evt.stopImmediatePropagation();
     }
@@ -748,6 +778,19 @@ export class TreeNode implements TreeNodeParam {
         return (this.childs.length > count) ? SelectionStatus.INDETERMINATE : SelectionStatus.SELECTED;
     }
 
+    childExpandChanged(node: TreeNode, expanded: boolean): void {
+        console.info("childExpandChanged");
+        if (expanded && this.expandOnlyOneNode) {
+            const count = this.childs ? this.childs.length : 0;
+            for (let i=0; i<count; i++) {
+                if (node !== this.childs[i]) {
+                    this.childs[i].collapse();
+                }
+            }
+        }
+    }
+
+
     childSelected(n: TreeNode, selectionStatus: SelectionStatus) {
         // console.info(`childSelected this=${this.data.bezeichnung} child=${n.data.bezeichnung} ${SelectionStatus[selectionStatus]}`);
         const selStatus = this._getStatusOfChilds();
@@ -764,7 +807,9 @@ export class TreeNode implements TreeNodeParam {
         // console.info(`childSelected this=${this.data.bezeichnung} child=${n.data.bezeichnung} ${SelectionStatus[selectionStatus]} 
         // => ${selStatus}`);
         this.selectionStatus = selStatus;
-        this.onSelectionChange.dispatch(this, selStatus);        
+        this.onSelectionChange.dispatch(this, selStatus);   
+        
+        
     }
 
 

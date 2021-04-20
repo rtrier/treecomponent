@@ -1,4 +1,4 @@
-
+@import './fontawesome.css';
 
 *, *:before, *:after {
     box-sizing: border-box;
@@ -29,7 +29,7 @@ $treerow-indent  : 1.0rem;
 	display: inline-block;
 	width: 1em;
     height: 1px;
-    background-color: aqua;
+    /*background-color: aqua;*/
 }
 
 .treecontainer {
@@ -69,6 +69,7 @@ $treerow-indent  : 1.0rem;
 .treerow * {
 	/* vertical-align: middle; */
 	align-self: center;
+	flex-shrink: 0;
 }
 
 .treeicon {
@@ -182,3 +183,16 @@ $treerow-indent  : 1.0rem;
 	opacity: 1;
   }
   */
+  /*
+.treeicon .opened, .treeicon .closed {
+	font-family: "Font Awesome 5 Free";
+  	font-weight: 900;
+}
+
+.treeicon .closed::after {
+	content: "\f0fe";
+}
+.treeicon .opened::after {
+	content: "\f146";
+}
+*/

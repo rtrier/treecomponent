@@ -3,19 +3,22 @@ import { SelectionMode, SelectionStatus, TreeNode } from "./TreeNode";
 
 
 export interface TreeParam {
-    selectMode?:SelectionMode
+    selectMode?:SelectionMode,
+    expandOnlyOneNode? : boolean
 }
 
 export class Tree {
-
 
     static NODE_SELECTION_CHANGE_EVENT = "nodeSelectionChange";
     static NODE_SELECTED_EVENT = "node_selected";
     static NODE_UNSELECTED_EVENT = "node_unselected";
 
     selectMode:SelectionMode = SelectionMode.SINGLE;
+    expandOnlyOneNode:boolean;
 
     nodeSelectionChangeHandler:(node:TreeNode, SelectionStatus:SelectionStatus)=>void;
+    childExpandChangeHandler: (node: TreeNode, expand: boolean) => void;
+
     onSelectionChange = new EventDispatcher<TreeNode, SelectionStatus>();
 
     pane: HTMLDivElement = null;
@@ -24,13 +27,16 @@ export class Tree {
 
     selectedNode: TreeNode;
 
-    observer: MutationObserver
+    observer: MutationObserver;
 
     constructor(nodes: Array<TreeNode>, param?:TreeParam) {
 
         if (param) {
             for (let k in param) {
                 this[k] = param[k]
+            }
+            if (param.expandOnlyOneNode) {
+                this.childExpandChangeHandler = (node, expanded) => this.childExpandChanged(node, expanded);
             }
         }
         this.nodeSelectionChangeHandler = (node, status) => this.nodeSelected(node, status);
@@ -39,6 +45,9 @@ export class Tree {
             for (let i = 0, count = nodes.length; i < count; i++) {
                 nodes[i].setTree(this)
                 nodes[i].onSelectionChange.subscribe(this.nodeSelectionChangeHandler);
+                if (this.expandOnlyOneNode) {
+                    nodes[i].onExpandChange.subscribe( this.childExpandChangeHandler );
+                }
             }
         }
         else {
@@ -69,21 +78,13 @@ export class Tree {
         }
     }
 
-    // resize1() {
-    //     console.info("TreeresizeTim " + this.pane.clientWidth);
-        
-    //     for (let i = 0, count = this.nodes.length; i < count; i++) {
-    //         this.nodes[i].resize();
-    //     }
-    // }
-
-
     addNode(node: TreeNode) {
         // console.info("addNode", node);
         node.setTree(this)
-        // node.on("selected", this.nodeSelected, this);
         node.onSelectionChange.subscribe( this.nodeSelectionChangeHandler );
-        // node.on("change", this.selectionChanged, this);
+        if (this.expandOnlyOneNode) {
+            node.onExpandChange.subscribe( this.childExpandChangeHandler );
+        }
         this.nodes.push(node)        
         if (this.pane) {
             let el = node.render()
@@ -92,10 +93,11 @@ export class Tree {
     }
 
     insertNode(node: TreeNode, pos:number) {
-        // console.info("insertNode "+pos);
         node.setTree(this)
         node.onSelectionChange.subscribe( this.nodeSelectionChangeHandler );
-        // node.on("change", this.selectionChanged, this);
+        if (this.expandOnlyOneNode) {
+            node.onExpandChange.subscribe( this.childExpandChangeHandler );
+        }
         let nodes:Array<TreeNode> = [];
         for (let i=0, count=this.nodes.length; i<count; i++) {
             if (i===pos) {
@@ -103,7 +105,6 @@ export class Tree {
             }
             nodes.push(this.nodes[i]);
         }   
-        // console.info("nodeAfter: ", this.nodes[pos].dom);
         if (pos<this.nodes.length) {
             this.pane.insertBefore(node.render(), this.nodes[pos].dom)
         }
@@ -165,6 +166,9 @@ export class Tree {
         // console.info("removeNode", node);
         node.setTree(null)
         node.onSelectionChange.unsubscribe(this.nodeSelectionChangeHandler);
+        if (this.expandOnlyOneNode) {
+            node.onExpandChange.unsubscribe( this.childExpandChangeHandler );
+        }
         // node.off("change", this.selectionChanged, this);
        
         if (node.parent) {
@@ -187,27 +191,14 @@ export class Tree {
         
     }
 
-
-
     onResize(ev: UIEvent): any {
-        // console.info(ev)
         this.resize()
     }
 
-    /*
-    replaceChilds(node: TreeNode, childs: TreeNode[]) {
-        console.info("replaceChilds", node.treerow);
-        node.setChilds(childs)
-        node.render()
-    }
-    */
 
     addTo(elem: HTMLElement) {
         if (!this.pane) {
             this._render()
-            // this.observer = new MutationObserver((mutations, observer) => this._mutation(mutations, observer));
-            // this.observer.observe(elem, { attributes: true, childList: true, subtree: true });
-
             window.addEventListener("resize", (ev:UIEvent) => this.onResize(ev))
         }
         let pane = this.getDom();
@@ -239,34 +230,29 @@ export class Tree {
         return result;
     }
 
-    /*
-    selectionChanged(evt) {
-        console.info('tree.selectionChanged: '+evt.type, evt);
-        this.fire("change");
+
+    childExpandChanged(node: TreeNode, expanded: boolean): void {
+        console.info("childExpandChanged");
+        if (expanded && this.expandOnlyOneNode) {
+            const count = this.nodes ? this.nodes.length : 0;
+            for (let i=0; i<count; i++) {
+                if (node !== this.nodes[i]) {
+                    this.nodes[i].collapse();
+                }
+            }
+        }
     }
-    */
+
 
     // nodeSelected(evt:L.LeafletEvent) {
     nodeSelected(node:TreeNode, status:SelectionStatus) {
         // console.info(`Tree nodeSelected(${node.data.name} status=${SelectionStatus[status]}) selectedNode=${this.selectedNode ? this.selectedNode.data.name : "undefined"}`);
-        /*
-        if (evt.changedNode) {
-            console.info('tree.nodeSelected:'+evt.type+ "  "+evt.changedNode.data.name+"  "+evt.changedNode.isSelected());
-        }
-        else {
-            console.info('tree.nodeSelected:'+evt.type);
-        }
-        */
         if (this.selectMode===SelectionMode.SINGLE) {
             if (this.selectedNode) {
                 // console.info(`oldSelectedNode=${this.selectedNode.data.name}  `+this.selectedNode.data.name);
                 if (this.selectedNode!==node) {
                     this.selectedNode.setSelected(false);
                 }
-                // const oldNode = this.selectedNode;
-                // this.selectedNode = null;
-                // console.info("dispatch01");
-                // this.onSelectionChange.dispatch(node, SelectionStatus.UNSELECTED); 
             }
             if (node && node.selectionStatus===SelectionStatus.SELECTED) {
                 this.selectedNode = node;

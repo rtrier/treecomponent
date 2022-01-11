@@ -7,6 +7,11 @@ export interface TreeParam {
     expandOnlyOneNode? : boolean
 }
 
+export interface ChangeNodeOrderEvent {
+    node:TreeNode;
+    up: boolean;
+}
+
 export class Tree {
 
     static NODE_SELECTION_CHANGE_EVENT = "nodeSelectionChange";
@@ -71,6 +76,40 @@ export class Tree {
         window.setTimeout(f, 520)       
     }
 
+
+    _update(): HTMLDivElement {
+        const pane = this.pane;
+        const newChilds = [];
+        
+        for (let i = 0, count = this.nodes.length; i < count; i++) {
+            newChilds.push(this.nodes[i].render());
+        }
+        pane.replaceChildren(...newChilds);
+        console.info("replacc")
+        return this.pane = pane;
+    }
+
+    moveNodeUp(n:TreeNode) {
+        console.info('moveNodeUp')
+        const idx = this.nodes.indexOf(n);
+        if (idx>0) {
+            const otherNode = this.nodes[idx-1];
+            this.nodes[idx-1] = n;
+            this.nodes[idx] = otherNode;
+        }
+        this._update();
+    }
+    moveNodeDown(n:TreeNode) {
+        console.info('moveNodeDown')
+        const idx = this.nodes.indexOf(n);
+        if (idx<this.nodes.length-1) {
+            const otherNode = this.nodes[idx+1];
+            this.nodes[idx+1] = n;
+            this.nodes[idx] = otherNode;
+        }
+        this._update();
+    }
+
     resize() {
         // console.info("Tree "+ this.nodes.length, this.pane.getBoundingClientRect());        
         for (let i = 0, count = this.nodes.length; i < count; i++) {
@@ -91,6 +130,28 @@ export class Tree {
             this.pane.appendChild(el);
         }
     }
+
+    addNodes(nodes: TreeNode[]) {
+        // console.info("addNode", node);
+        const newNodes:TreeNode[] = [];
+        const d = document.createDocumentFragment();
+        for (let i=0; i<nodes.length; i++) {
+            const node = nodes[i]
+            node.setTree(this)
+            node.onSelectionChange.subscribe( this.nodeSelectionChangeHandler );
+            if (this.expandOnlyOneNode) {
+                node.onExpandChange.subscribe( this.childExpandChangeHandler );
+            }
+            this.nodes.push(node)    
+            newNodes.push(node);
+            d.appendChild(node.render());
+        }
+        if (this.pane) {
+
+            // let el = node.render()
+            this.pane.appendChild(d);
+        }
+    }    
 
     insertNode(node: TreeNode, pos:number) {
         node.setTree(this)
